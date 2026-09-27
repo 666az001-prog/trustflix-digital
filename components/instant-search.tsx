@@ -1,0 +1,4 @@
+"use client";
+import { Search } from "lucide-react";
+import { useEffect, useId } from "react";
+export function InstantSearch({ rowSelector, placeholder }: { rowSelector: string; placeholder: string }) { const id = useId(); useEffect(() => { const input = document.getElementById(id) as HTMLInputElement | null; if (!input) return; const filter = () => { const term = input.value.toLocaleLowerCase("fr-FR").trim(); document.querySelectorAll<HTMLElement>(rowSelector).forEach(row => { row.style.display = row.textContent?.toLocaleLowerCase("fr-FR").includes(term) ? "" : "none"; }); }; input.addEventListener("input", filter); return () => input.removeEventListener("input", filter); }, [id, rowSelector]); return <label className="relative block max-w-sm"><Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={17}/><input id={id} className="pl-10" type="search" placeholder={placeholder} autoComplete="off"/></label>; }

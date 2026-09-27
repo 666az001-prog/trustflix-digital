@@ -1,0 +1,18 @@
+# TrustFlix Digital — configuration Apache minimale et sécurisée
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+<FilesMatch "^(\.env|\.git|composer\.json|package\.json|schema\.sql|.*\.log)$">
+    Require all denied
+</FilesMatch>
+
+# Empêche l’accès aux dossiers sensibles
+RedirectMatch 403 ^/config/.*$
+RedirectMatch 403 ^/database/.*$
+RedirectMatch 403 ^/includes/.*$

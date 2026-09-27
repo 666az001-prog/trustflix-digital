@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url = env("DATABASE_URL")
+}
+
+model Service {
+  id String @id @default(cuid())
+  name String @unique
+  slug String @unique
+  slotPrefix String @default("Place") @map("slot_prefix")
+  defaultSlotCount Int @default(1) @map("default_slot_count")
+  requiresPin Boolean @default(false) @map("requires_pin")
+  createdAt DateTime @default(now()) @map("created_at")
+  accounts Account[]
+  clients Client[]
+  @@map("services")
+}
+model Account {
+  id String @id @default(cuid())
+  serviceId String @map("service_id")
+  email String
+  passwordEncrypted String @map("password_encrypted")
+  renewalDate DateTime @map("renewal_date")
+  status String @default("ACTIVE")
+  createdAt DateTime @default(now()) @map("created_at")
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  slots Slot[]
+  @@index([serviceId, status])
+  @@map("accounts")
+}
+model Slot {
+  id String @id @default(cuid())
+  accountId String @map("account_id")
+  identifier String
+  pinCodeEncrypted String? @map("pin_code_encrypted")
+  status String @default("FREE")
+  createdAt DateTime @default(now()) @map("created_at")
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  client Client?
+  @@unique([accountId, identifier])
+  @@index([status])
+  @@map("slots")
+}
+model Client {
+  id String @id @default(cuid())
+  name String
+  whatsapp String
+  serviceId String @map("service_id")
+  slotId String? @unique @map("slot_id")
+  price Decimal
+  startDate DateTime @map("start_date")
+  endDate DateTime @map("end_date")
+  status String @default("ACTIVE")
+  createdAt DateTime @default(now()) @map("created_at")
+  service Service @relation(fields: [serviceId], references: [id])
+  slot Slot? @relation(fields: [slotId], references: [id])
+  payments Payment[]
+  @@index([serviceId, status])
+  @@index([endDate])
+  @@map("clients")
+}
+model Payment {
+  id String @id @default(cuid())
+  clientId String @map("client_id")
+  amount Decimal
+  createdAt DateTime @default(now()) @map("created_at")
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  @@index([createdAt])
+  @@map("payments")
+}
+model Expense {
+  id String @id @default(cuid())
+  label String
+  amount Decimal
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([createdAt])
+  @@map("expenses")
+}
