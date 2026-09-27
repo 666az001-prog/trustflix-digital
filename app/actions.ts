@@ -14,12 +14,22 @@ const CLIENT_ACTIVE = "ACTIVE" as const;
 const CLIENT_EXPIRED = "EXPIRED" as const;
 
 const accountSchema = z.object({ serviceId: z.string().min(1), email: z.string().email(), password: z.string().min(8), renewalDate: z.coerce.date() });
-export async function createAccount(formData: FormData) {
-  const data = accountSchema.parse(Object.fromEntries(formData));
-  const selectedService = serviceCatalog.find(service => service.id === data.serviceId);
-  const service = await prisma.service.upsert({ where: { slug: selectedService?.slug ?? data.serviceId }, update: {}, create: selectedService ?? { name: data.serviceId, slug: data.serviceId, slotPrefix: "Place", defaultSlotCount: 1, requiresPin: false } });
-  await prisma.account.create({ data: { serviceId: service.id, email: data.email.toLowerCase(), passwordEncrypted: encrypt(data.password), renewalDate: data.renewalDate, status: ACCOUNT_ACTIVE, slots: { create: Array.from({ length: service.defaultSlotCount }, (_, i) => ({ identifier: `${service.slotPrefix} ${i + 1}`, pinCodeEncrypted: service.requiresPin ? encrypt(String(crypto.randomInt(1000, 10000))) : null })) } } });
+export type AccountActionState = { error?: string; success?: string };
+export async function createAccount(_previousState: AccountActionState, formData: FormData): Promise<AccountActionState> {
+  const parsed = accountSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Vérifiez le service, l’e-mail, le mot de passe et la date de renouvellement." };
+  const data = parsed.data;
+  try {
+    const selectedService = serviceCatalog.find(service => service.id === data.serviceId);
+    const existingService = selectedService ? null : await prisma.service.findUnique({ where: { id: data.serviceId } });
+    const service = existingService ?? await prisma.service.upsert({ where: { slug: selectedService?.slug ?? data.serviceId }, update: {}, create: selectedService ?? { name: data.serviceId, slug: data.serviceId, slotPrefix: "Place", defaultSlotCount: 1, requiresPin: false } });
+    await prisma.account.create({ data: { serviceId: service.id, email: data.email.toLowerCase(), passwordEncrypted: encrypt(data.password), renewalDate: data.renewalDate, status: ACCOUNT_ACTIVE, slots: { create: Array.from({ length: service.defaultSlotCount }, (_, i) => ({ identifier: `${service.slotPrefix} ${i + 1}`, pinCodeEncrypted: service.requiresPin ? encrypt(String(crypto.randomInt(1000, 10000))) : null })) } } });
+  } catch (error) {
+    console.error("TrustFlix Digital account creation error", error);
+    return { error: "Impossible de créer le compte. Vérifiez la connexion à la base et les variables Vercel." };
+  }
   revalidatePath("/accounts"); revalidatePath("/");
+  return { success: "Compte maître créé avec succès." };
 }
 const clientSchema = z.object({ name: z.string().min(2).max(100), whatsapp: z.string().min(7).max(30), serviceId: z.string().min(1), price: z.coerce.number().positive() });
 export type ClientActionState = { error?: string };
