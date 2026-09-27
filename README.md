@@ -12,7 +12,17 @@ SaaS de gestion des reventes d’abonnements streaming, construit avec Next.js 1
 
 ## Déploiement Vercel
 
-Ajoutez `DATABASE_URL`, `ACCOUNT_CREDENTIALS_KEY` et `CRON_SECRET` dans les variables d’environnement Vercel, puis déployez le dépôt. Le cron Vercel quotidien libère automatiquement les slots dont les clients ont expiré. Le script de build génère automatiquement le client Prisma.
+Ajoutez ces variables dans Vercel, pour les environnements Preview et Production :
+
+```text
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.qrugbbynubipoacvewdo.supabase.co:5432/postgres?sslmode=require&schema=public
+NEXT_PUBLIC_SUPABASE_URL=https://qrugbbynubipoacvewdo.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_YcjFzcsfoGaboo4nZvQOrQ__zHBsI2y
+ACCOUNT_CREDENTIALS_KEY=[GENERATE_A_32_BYTE_BASE64_KEY]
+CRON_SECRET=[GENERATE_A_RANDOM_SECRET]
+```
+
+Remplacez `[YOUR-PASSWORD]` par le mot de passe PostgreSQL Supabase, puis redéployez le dernier commit. Créez les tables dans Supabase avec `npx prisma db push` depuis une machine qui possède cette `DATABASE_URL`, puis lancez `npm run db:seed`. Le cron Vercel quotidien libère automatiquement les slots dont les clients ont expiré.
 
 ## Sécurité
 
