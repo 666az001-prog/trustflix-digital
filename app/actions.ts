@@ -19,15 +19,27 @@ export async function createAccount(formData: FormData) {
   await prisma.account.create({ data: { serviceId: data.serviceId, email: data.email.toLowerCase(), passwordEncrypted: encrypt(data.password), renewalDate: data.renewalDate, status: ACCOUNT_ACTIVE, slots: { create: Array.from({ length: service.defaultSlotCount }, (_, i) => ({ identifier: `${service.slotPrefix} ${i + 1}`, pinCodeEncrypted: service.requiresPin ? encrypt(String(crypto.randomInt(1000, 10000))) : null })) } } });
   revalidatePath("/accounts"); revalidatePath("/");
 }
-const clientSchema = z.object({ name: z.string().min(2).max(100), whatsapp: z.string().min(7).max(30), serviceId: z.string().min(1), price: z.coerce.number().positive(), startDate: z.coerce.date(), endDate: z.coerce.date() }).refine(v => v.endDate > v.startDate, { message: "La date de fin doit être postérieure à la date de début." });
-export async function createClient(formData: FormData) {
-  const data = clientSchema.parse(Object.fromEntries(formData));
-  await prisma.$transaction(async tx => {
-    const client = await tx.client.create({ data: { ...data, price: new Prisma.Decimal(data.price), status: CLIENT_ACTIVE } });
-    await assignSlotToClient(tx, data.serviceId, client.id);
-    await tx.payment.create({ data: { clientId: client.id, amount: new Prisma.Decimal(data.price) } });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+const clientSchema = z.object({ name: z.string().min(2).max(100), whatsapp: z.string().min(7).max(30), serviceId: z.string().min(1), price: z.coerce.number().positive() });
+export type ClientActionState = { error?: string };
+export async function createClient(_previousState: ClientActionState, formData: FormData): Promise<ClientActionState> {
+  const parsed = clientSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Vérifiez le nom, le numéro WhatsApp, le service et le prix." };
+  const data = parsed.data;
+  const startDate = new Date();
+  startDate.setHours(0, 0, 0, 0);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 30);
+  try {
+    await prisma.$transaction(async tx => {
+      const client = await tx.client.create({ data: { name: data.name, whatsapp: data.whatsapp, serviceId: data.serviceId, price: new Prisma.Decimal(data.price), startDate, endDate, status: CLIENT_ACTIVE } });
+      await assignSlotToClient(tx, data.serviceId, client.id);
+      await tx.payment.create({ data: { clientId: client.id, amount: new Prisma.Decimal(data.price) } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Impossible d'ajouter ce client." };
+  }
   revalidatePath("/clients"); revalidatePath("/"); revalidatePath("/accounts");
+  return {};
 }
 export async function releaseClient(clientId: string) {
   await prisma.$transaction(async tx => { const client = await tx.client.findUniqueOrThrow({ where: { id: clientId } }); await tx.client.update({ where: { id: clientId }, data: { status: CLIENT_EXPIRED } }); if (client.slotId) await tx.slot.update({ where: { id: client.slotId }, data: { status: SLOT_FREE } }); });
