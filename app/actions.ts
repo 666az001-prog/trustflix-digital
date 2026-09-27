@@ -6,6 +6,7 @@ import crypto from "crypto";
 import { encrypt } from "../lib/crypto";
 import { prisma } from "../lib/prisma";
 import { assignSlotToClient } from "../lib/slot-assignment";
+import { serviceCatalog } from "../lib/services";
 
 const ACCOUNT_ACTIVE = "ACTIVE" as const;
 const SLOT_FREE = "FREE" as const;
@@ -15,8 +16,9 @@ const CLIENT_EXPIRED = "EXPIRED" as const;
 const accountSchema = z.object({ serviceId: z.string().min(1), email: z.string().email(), password: z.string().min(8), renewalDate: z.coerce.date() });
 export async function createAccount(formData: FormData) {
   const data = accountSchema.parse(Object.fromEntries(formData));
-  const service = await prisma.service.findUniqueOrThrow({ where: { id: data.serviceId } });
-  await prisma.account.create({ data: { serviceId: data.serviceId, email: data.email.toLowerCase(), passwordEncrypted: encrypt(data.password), renewalDate: data.renewalDate, status: ACCOUNT_ACTIVE, slots: { create: Array.from({ length: service.defaultSlotCount }, (_, i) => ({ identifier: `${service.slotPrefix} ${i + 1}`, pinCodeEncrypted: service.requiresPin ? encrypt(String(crypto.randomInt(1000, 10000))) : null })) } } });
+  const selectedService = serviceCatalog.find(service => service.id === data.serviceId);
+  const service = await prisma.service.upsert({ where: { slug: selectedService?.slug ?? data.serviceId }, update: {}, create: selectedService ?? { name: data.serviceId, slug: data.serviceId, slotPrefix: "Place", defaultSlotCount: 1, requiresPin: false } });
+  await prisma.account.create({ data: { serviceId: service.id, email: data.email.toLowerCase(), passwordEncrypted: encrypt(data.password), renewalDate: data.renewalDate, status: ACCOUNT_ACTIVE, slots: { create: Array.from({ length: service.defaultSlotCount }, (_, i) => ({ identifier: `${service.slotPrefix} ${i + 1}`, pinCodeEncrypted: service.requiresPin ? encrypt(String(crypto.randomInt(1000, 10000))) : null })) } } });
   revalidatePath("/accounts"); revalidatePath("/");
 }
 const clientSchema = z.object({ name: z.string().min(2).max(100), whatsapp: z.string().min(7).max(30), serviceId: z.string().min(1), price: z.coerce.number().positive() });
@@ -31,8 +33,10 @@ export async function createClient(_previousState: ClientActionState, formData: 
   endDate.setDate(endDate.getDate() + 30);
   try {
     await prisma.$transaction(async tx => {
-      const client = await tx.client.create({ data: { name: data.name, whatsapp: data.whatsapp, serviceId: data.serviceId, price: new Prisma.Decimal(data.price), startDate, endDate, status: CLIENT_ACTIVE } });
-      await assignSlotToClient(tx, data.serviceId, client.id);
+      const selectedService = serviceCatalog.find(service => service.id === data.serviceId);
+      const service = await tx.service.upsert({ where: { slug: selectedService?.slug ?? data.serviceId }, update: {}, create: selectedService ?? { name: data.serviceId, slug: data.serviceId, slotPrefix: "Place", defaultSlotCount: 1, requiresPin: false } });
+      const client = await tx.client.create({ data: { name: data.name, whatsapp: data.whatsapp, serviceId: service.id, price: new Prisma.Decimal(data.price), startDate, endDate, status: CLIENT_ACTIVE } });
+      await assignSlotToClient(tx, service.id, client.id);
       await tx.payment.create({ data: { clientId: client.id, amount: new Prisma.Decimal(data.price) } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {

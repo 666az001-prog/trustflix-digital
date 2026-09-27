@@ -6,17 +6,20 @@ import { date } from "../../lib/format";
 import { SubmitButton } from "../../components/submit-button";
 import { InstantSearch } from "../../components/instant-search";
 import { DeleteAccountButton } from "./account-actions";
+import { serviceCatalog } from "../../lib/services";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountsPage() {
-  let services: Awaited<ReturnType<typeof prisma.service.findMany>> = [];
+  let services: Array<{ id: string; name: string }> = serviceCatalog.map(({ id, name }) => ({ id, name }));
   let accounts: Prisma.AccountGetPayload<{ include: { service: true; slots: { orderBy: { identifier: "asc" } } } }>[] = [];
   try {
-    [services, accounts] = await Promise.all([
+    const [databaseServices, loadedAccounts] = await Promise.all([
       prisma.service.findMany({ orderBy: { name: "asc" } }),
       prisma.account.findMany({ include: { service: true, slots: { orderBy: { identifier: "asc" } } }, orderBy: { createdAt: "desc" } }),
     ]);
+    services = databaseServices.length > 0 ? databaseServices : services;
+    accounts = loadedAccounts;
   } catch (error) {
     console.error("TrustFlix Digital accounts error", error);
   }

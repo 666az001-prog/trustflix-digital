@@ -6,17 +6,20 @@ import { ExpiryBadge } from "../../components/expiry-badge";
 import { InstantSearch } from "../../components/instant-search";
 import { NewClientForm } from "./new-client-form";
 import { ReleaseButton } from "./client-actions";
+import { serviceCatalog } from "../../lib/services";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
-  let services: Awaited<ReturnType<typeof prisma.service.findMany>> = [];
+  let services: Array<{ id: string; name: string }> = serviceCatalog.map(({ id, name }) => ({ id, name }));
   let clients: Prisma.ClientGetPayload<{ include: { service: true; slot: true } }>[] = [];
   try {
-    [services, clients] = await Promise.all([
+    const [databaseServices, loadedClients] = await Promise.all([
       prisma.service.findMany({ orderBy: { name: "asc" } }),
       prisma.client.findMany({ include: { service: true, slot: true }, orderBy: { createdAt: "desc" } }),
     ]);
+    services = databaseServices.length > 0 ? databaseServices : services;
+    clients = loadedClients;
   } catch (error) {
     console.error("TrustFlix Digital clients error", error);
   }
