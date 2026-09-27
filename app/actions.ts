@@ -49,6 +49,17 @@ export async function deleteClient(clientId: string) {
   await prisma.$transaction(async tx => { const client = await tx.client.findUniqueOrThrow({ where: { id: clientId } }); if (client.slotId) await tx.slot.update({ where: { id: client.slotId }, data: { status: SLOT_FREE } }); await tx.client.delete({ where: { id: clientId } }); });
   revalidatePath("/clients"); revalidatePath("/"); revalidatePath("/accounts");
 }
+export async function deleteAccount(accountId: string) {
+  await prisma.$transaction(async tx => {
+    const account = await tx.account.findUniqueOrThrow({ where: { id: accountId }, include: { slots: { select: { id: true } } } });
+    const slotIds = account.slots.map(slot => slot.id);
+    if (slotIds.length > 0) {
+      await tx.client.updateMany({ where: { slotId: { in: slotIds } }, data: { status: CLIENT_EXPIRED, slotId: null } });
+    }
+    await tx.account.delete({ where: { id: accountId } });
+  });
+  revalidatePath("/accounts"); revalidatePath("/clients"); revalidatePath("/");
+}
 const expenseSchema = z.object({ label: z.string().min(2).max(120), amount: z.coerce.number().positive() });
 export async function createExpense(formData: FormData) {
   const data = expenseSchema.parse(Object.fromEntries(formData));

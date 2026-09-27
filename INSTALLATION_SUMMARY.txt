@@ -1,5 +1,5 @@
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║          🎬 TrustFlix Digital V2 - INSTALLATION COMPLÈTE ✅              ║
+║          🎬 TrustFlix Digital - INSTALLATION COMPLÈTE ✅                 ║
 ║                   PHP 8.2 / MySQL / InfinityFree Ready                   ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 

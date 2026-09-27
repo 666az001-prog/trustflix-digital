@@ -1,4 +1,4 @@
-# TrustFlix Digital V2 - Guide de Déploiement InfinityFree
+# TrustFlix Digital - Guide de Déploiement InfinityFree
 
 ## 📋 Prérequis
 

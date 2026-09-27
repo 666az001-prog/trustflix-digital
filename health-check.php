@@ -1,6 +1,6 @@
 <?php
 /**
- * TrustFlix Digital V2 - Health Check
+ * TrustFlix Digital - Health Check
  * À utiliser UNIQUEMENT en développement local
  * Supprimer en production !
  */
