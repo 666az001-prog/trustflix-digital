@@ -1,4 +1,5 @@
 import { Plus, ShieldCheck } from "lucide-react";
+import type { Prisma } from "@prisma/client";
 import { createAccount } from "../actions";
 import { prisma } from "../../lib/prisma";
 import { date } from "../../lib/format";
@@ -9,10 +10,16 @@ import { DeleteAccountButton } from "./account-actions";
 export const dynamic = "force-dynamic";
 
 export default async function AccountsPage() {
-  const [services, accounts] = await Promise.all([
-    prisma.service.findMany({ orderBy: { name: "asc" } }),
-    prisma.account.findMany({ include: { service: true, slots: { orderBy: { identifier: "asc" } } }, orderBy: { createdAt: "desc" } }),
-  ]);
+  let services: Awaited<ReturnType<typeof prisma.service.findMany>> = [];
+  let accounts: Prisma.AccountGetPayload<{ include: { service: true; slots: { orderBy: { identifier: "asc" } } } }>[] = [];
+  try {
+    [services, accounts] = await Promise.all([
+      prisma.service.findMany({ orderBy: { name: "asc" } }),
+      prisma.account.findMany({ include: { service: true, slots: { orderBy: { identifier: "asc" } } }, orderBy: { createdAt: "desc" } }),
+    ]);
+  } catch (error) {
+    console.error("TrustFlix Digital accounts error", error);
+  }
 
   return <>
     <div className="mb-8"><p className="text-sm text-amber-500">Inventaire</p><h1 className="mt-1 text-3xl font-bold">Comptes maîtres</h1><p className="mt-2 text-sm text-zinc-400">Chaque compte génère automatiquement les places prévues par son service.</p></div>

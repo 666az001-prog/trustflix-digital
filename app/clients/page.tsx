@@ -1,4 +1,5 @@
 import { MessageCircle } from "lucide-react";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { date, money, whatsappUrl } from "../../lib/format";
 import { ExpiryBadge } from "../../components/expiry-badge";
@@ -9,10 +10,16 @@ import { ReleaseButton } from "./client-actions";
 export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
-  const [services, clients] = await Promise.all([
-    prisma.service.findMany({ orderBy: { name: "asc" } }),
-    prisma.client.findMany({ include: { service: true, slot: true }, orderBy: { createdAt: "desc" } }),
-  ]);
+  let services: Awaited<ReturnType<typeof prisma.service.findMany>> = [];
+  let clients: Prisma.ClientGetPayload<{ include: { service: true; slot: true } }>[] = [];
+  try {
+    [services, clients] = await Promise.all([
+      prisma.service.findMany({ orderBy: { name: "asc" } }),
+      prisma.client.findMany({ include: { service: true, slot: true }, orderBy: { createdAt: "desc" } }),
+    ]);
+  } catch (error) {
+    console.error("TrustFlix Digital clients error", error);
+  }
 
   return <>
     <div className="mb-8">

@@ -1,5 +1,9 @@
 # TrustFlix Digital - Guide de Déploiement InfinityFree
 
+## Variables Vercel
+
+Pour le déploiement Next.js, configurez dans Vercel les variables `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `ACCOUNT_CREDENTIALS_KEY` et `CRON_SECRET`. `DATABASE_URL` doit être la chaîne PostgreSQL de votre projet Supabase, avec `?schema=public`.
+
 ## 📋 Prérequis
 
 - Compte InfinityFree (gratuit)
