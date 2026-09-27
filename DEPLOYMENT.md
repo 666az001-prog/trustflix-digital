@@ -2,7 +2,7 @@
 
 ## Variables Vercel
 
-Pour le déploiement Next.js, configurez dans Vercel les variables `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `ACCOUNT_CREDENTIALS_KEY` et `CRON_SECRET`. `DATABASE_URL` doit être la chaîne PostgreSQL de votre projet Supabase, avec SSL activé : `postgresql://postgres:[YOUR-PASSWORD]@db.qrugbbynubipoacvewdo.supabase.co:5432/postgres?sslmode=require&schema=public`.
+Pour le déploiement Next.js, configurez dans Vercel les variables `DATABASE_URL`, `DIRECT_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `ACCOUNT_CREDENTIALS_KEY` et `CRON_SECRET`. Copiez les URI **Transaction pooler** (port `6543`) et **Session pooler** (port `5432`) depuis **Connect** dans Supabase : utilisez-les respectivement pour `DATABASE_URL` et `DIRECT_URL`. Le pooler partagé est accessible en IPv4 ; l’endpoint direct `db.<project-ref>.supabase.co` est IPv6 uniquement sans option IPv4. Gardez `sslmode=require` et ajoutez `pgbouncer=true&connection_limit=1` à `DATABASE_URL` pour Prisma en serverless.
 
 ## 📋 Prérequis
 
