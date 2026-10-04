@@ -19,8 +19,8 @@ Ajoutez ces variables dans Vercel, pour les environnements Preview et Production
 ```text
 DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@[POOLER-HOST]:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1&schema=public
 DIRECT_URL=postgresql://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@[POOLER-HOST]:5432/postgres?sslmode=require&schema=public
-NEXT_PUBLIC_SUPABASE_URL=https://qrugbbynubipoacvewdo.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_YcjFzcsfoGaboo4nZvQOrQ__zHBsI2y
+NEXT_PUBLIC_SUPABASE_URL=https://scrzyrqaapxhzbyefszc.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=[COPY_THE_NEW_PROJECT_PUBLISHABLE_KEY]
 ACCOUNT_CREDENTIALS_KEY=[GENERATE_A_32_BYTE_BASE64_KEY]
 CRON_SECRET=[GENERATE_A_RANDOM_SECRET]
 ```
