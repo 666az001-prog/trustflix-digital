@@ -31,7 +31,7 @@ export async function createAccount(_previousState: AccountActionState, formData
   revalidatePath("/accounts"); revalidatePath("/");
   return { success: "Compte maître créé avec succès." };
 }
-const clientSchema = z.object({ name: z.string().min(2).max(100), whatsapp: z.string().min(7).max(30), serviceId: z.string().min(1), price: z.coerce.number().positive(), pinCode: z.string().regex(/^\d{4}$/) });
+const clientSchema = z.object({ name: z.string().min(2).max(100), whatsapp: z.string().min(7).max(30), serviceId: z.string().min(1), accountId: z.string().min(1), price: z.coerce.number().positive(), pinCode: z.string().regex(/^\d{4}$/) });
 export type ClientActionState = { error?: string };
 export async function createClient(_previousState: ClientActionState, formData: FormData): Promise<ClientActionState> {
   const parsed = clientSchema.safeParse(Object.fromEntries(formData));
@@ -46,8 +46,10 @@ export async function createClient(_previousState: ClientActionState, formData: 
       const selectedService = serviceCatalog.find(service => service.id === data.serviceId);
       const existingService = selectedService ? null : await tx.service.findUnique({ where: { id: data.serviceId } });
       const service = existingService ?? await tx.service.upsert({ where: { slug: selectedService?.slug ?? data.serviceId }, update: {}, create: selectedService ?? { name: data.serviceId, slug: data.serviceId, slotPrefix: "Place", defaultSlotCount: 1, requiresPin: false } });
+      const selectedAccount = await tx.account.findFirst({ where: { id: data.accountId, serviceId: service.id, status: ACCOUNT_ACTIVE, slots: { some: { status: SLOT_FREE } } }, select: { id: true } });
+      if (!selectedAccount) throw new Error("Le compte sélectionné n’appartient pas à ce service ou n’a plus de place libre.");
       const client = await tx.client.create({ data: { name: data.name, whatsapp: data.whatsapp, serviceId: service.id, price: new Prisma.Decimal(data.price), startDate, endDate, status: CLIENT_ACTIVE } });
-      const assignment = await assignSlotToClient(tx, service.id, client.id);
+      const assignment = await assignSlotToClient(tx, service.id, selectedAccount.id, client.id);
       await tx.slot.update({ where: { id: assignment.slot.id }, data: { pinCodeEncrypted: encrypt(data.pinCode) } });
       await tx.payment.create({ data: { clientId: client.id, amount: new Prisma.Decimal(data.price) } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

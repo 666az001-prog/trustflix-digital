@@ -13,13 +13,16 @@ export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
   let services: Array<{ id: string; name: string }> = serviceCatalog.map(({ id, name }) => ({ id, name }));
+  let accounts: Array<{ id: string; serviceId: string; email: string; freeSlots: number }> = [];
   let clients: Prisma.ClientGetPayload<{ include: { service: true; slot: true } }>[] = [];
   try {
-    const [databaseServices, loadedClients] = await Promise.all([
+    const [databaseServices, availableAccounts, loadedClients] = await Promise.all([
       prisma.service.findMany({ orderBy: { name: "asc" } }),
+      prisma.account.findMany({ where: { status: "ACTIVE", slots: { some: { status: "FREE" } } }, include: { slots: { where: { status: "FREE" }, select: { id: true } } }, orderBy: { email: "asc" } }),
       prisma.client.findMany({ include: { service: true, slot: true }, orderBy: { createdAt: "desc" } }),
     ]);
     services = databaseServices.length > 0 ? databaseServices : services;
+    accounts = availableAccounts.map(account => ({ id: account.id, serviceId: account.serviceId, email: account.email, freeSlots: account.slots.length }));
     clients = loadedClients;
   } catch (error) {
     console.error("TrustFlix Digital clients error", error);
@@ -29,9 +32,9 @@ export default async function ClientsPage() {
     <div className="mb-8">
       <p className="text-sm text-amber-500">Relation client</p>
       <h1 className="mt-1 text-3xl font-bold">Clients</h1>
-      <p className="mt-2 text-sm text-zinc-400">Un profil ou une place libre est attribué automatiquement au service choisi.</p>
+      <p className="mt-2 text-sm text-zinc-400">Choisissez le compte maître : une place libre lui sera attribuée.</p>
     </div>
-    <NewClientForm services={services}/>
+    <NewClientForm services={services} accounts={accounts}/>
     <section className="card overflow-x-auto">
       <div className="mb-5"><InstantSearch rowSelector=".client-row" placeholder="Rechercher un client, service ou numéro…"/></div>
       <table className="w-full min-w-[720px] text-left text-sm">
