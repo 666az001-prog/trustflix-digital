@@ -20,10 +20,12 @@ export async function createAccount(_previousState: AccountActionState, formData
   if (!parsed.success) return { error: "Vérifiez le service, l’e-mail, le mot de passe et la date de renouvellement." };
   const data = parsed.data;
   try {
-    const selectedService = serviceCatalog.find(service => service.id === data.serviceId);
-    const existingService = selectedService ? null : await prisma.service.findUnique({ where: { id: data.serviceId } });
-    const service = existingService ?? await prisma.service.upsert({ where: { slug: selectedService?.slug ?? data.serviceId }, update: {}, create: selectedService ?? { name: data.serviceId, slug: data.serviceId, slotPrefix: "Place", defaultSlotCount: 1, requiresPin: false } });
-    await prisma.account.create({ data: { serviceId: service.id, email: data.email.toLowerCase(), passwordEncrypted: encrypt(data.password), renewalDate: data.renewalDate, status: ACCOUNT_ACTIVE, slots: { create: Array.from({ length: 5 }, (_, i) => ({ identifier: `${service.slotPrefix} ${i + 1}`, pinCodeEncrypted: service.requiresPin ? encrypt(String(crypto.randomInt(1000, 10000))) : null })) } } });
+    const existingService = await prisma.service.findUnique({ where: { id: data.serviceId } });
+    const selectedService = serviceCatalog.find(service => service.id === data.serviceId || service.slug === data.serviceId || service.slug === existingService?.slug);
+    const service = selectedService
+      ? await prisma.service.upsert({ where: { slug: selectedService.slug }, update: { name: selectedService.name, slotPrefix: selectedService.slotPrefix, defaultSlotCount: selectedService.defaultSlotCount, requiresPin: selectedService.requiresPin }, create: selectedService })
+      : existingService ?? await prisma.service.upsert({ where: { slug: data.serviceId }, update: {}, create: { name: data.serviceId, slug: data.serviceId, slotPrefix: "Place", defaultSlotCount: 5, requiresPin: false } });
+    await prisma.account.create({ data: { serviceId: service.id, email: data.email.toLowerCase(), passwordEncrypted: encrypt(data.password), renewalDate: data.renewalDate, status: ACCOUNT_ACTIVE, slots: { create: Array.from({ length: service.defaultSlotCount }, (_, i) => ({ identifier: `${service.slotPrefix} ${i + 1}`, pinCodeEncrypted: service.requiresPin ? encrypt(String(crypto.randomInt(1000, 10000))) : null })) } } });
   } catch (error) {
     console.error("TrustFlix Digital account creation error", error);
     return { error: "Impossible de créer le compte. Vérifiez la connexion à la base et les variables Vercel." };
