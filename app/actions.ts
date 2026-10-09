@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import crypto from "crypto";
-import { encrypt } from "../lib/crypto";
+import { decrypt, encrypt } from "../lib/crypto";
 import { prisma } from "../lib/prisma";
 import { assignSlotToClient } from "../lib/slot-assignment";
 import { serviceCatalog } from "../lib/services";
@@ -23,7 +23,7 @@ export async function createAccount(_previousState: AccountActionState, formData
     const selectedService = serviceCatalog.find(service => service.id === data.serviceId);
     const existingService = selectedService ? null : await prisma.service.findUnique({ where: { id: data.serviceId } });
     const service = existingService ?? await prisma.service.upsert({ where: { slug: selectedService?.slug ?? data.serviceId }, update: {}, create: selectedService ?? { name: data.serviceId, slug: data.serviceId, slotPrefix: "Place", defaultSlotCount: 1, requiresPin: false } });
-    await prisma.account.create({ data: { serviceId: service.id, email: data.email.toLowerCase(), passwordEncrypted: encrypt(data.password), renewalDate: data.renewalDate, status: ACCOUNT_ACTIVE, slots: { create: Array.from({ length: service.defaultSlotCount }, (_, i) => ({ identifier: `${service.slotPrefix} ${i + 1}`, pinCodeEncrypted: service.requiresPin ? encrypt(String(crypto.randomInt(1000, 10000))) : null })) } } });
+    await prisma.account.create({ data: { serviceId: service.id, email: data.email.toLowerCase(), passwordEncrypted: encrypt(data.password), renewalDate: data.renewalDate, status: ACCOUNT_ACTIVE, slots: { create: Array.from({ length: 5 }, (_, i) => ({ identifier: `${service.slotPrefix} ${i + 1}`, pinCodeEncrypted: service.requiresPin ? encrypt(String(crypto.randomInt(1000, 10000))) : null })) } } });
   } catch (error) {
     console.error("TrustFlix Digital account creation error", error);
     return { error: "Impossible de créer le compte. Vérifiez la connexion à la base et les variables Vercel." };
@@ -31,7 +31,7 @@ export async function createAccount(_previousState: AccountActionState, formData
   revalidatePath("/accounts"); revalidatePath("/");
   return { success: "Compte maître créé avec succès." };
 }
-const clientSchema = z.object({ name: z.string().min(2).max(100), whatsapp: z.string().min(7).max(30), serviceId: z.string().min(1), price: z.coerce.number().positive() });
+const clientSchema = z.object({ name: z.string().min(2).max(100), whatsapp: z.string().min(7).max(30), serviceId: z.string().min(1), price: z.coerce.number().positive(), pinCode: z.string().regex(/^\d{4}$/) });
 export type ClientActionState = { error?: string };
 export async function createClient(_previousState: ClientActionState, formData: FormData): Promise<ClientActionState> {
   const parsed = clientSchema.safeParse(Object.fromEntries(formData));
@@ -44,9 +44,11 @@ export async function createClient(_previousState: ClientActionState, formData: 
   try {
     await prisma.$transaction(async tx => {
       const selectedService = serviceCatalog.find(service => service.id === data.serviceId);
-      const service = await tx.service.upsert({ where: { slug: selectedService?.slug ?? data.serviceId }, update: {}, create: selectedService ?? { name: data.serviceId, slug: data.serviceId, slotPrefix: "Place", defaultSlotCount: 1, requiresPin: false } });
+      const existingService = selectedService ? null : await tx.service.findUnique({ where: { id: data.serviceId } });
+      const service = existingService ?? await tx.service.upsert({ where: { slug: selectedService?.slug ?? data.serviceId }, update: {}, create: selectedService ?? { name: data.serviceId, slug: data.serviceId, slotPrefix: "Place", defaultSlotCount: 1, requiresPin: false } });
       const client = await tx.client.create({ data: { name: data.name, whatsapp: data.whatsapp, serviceId: service.id, price: new Prisma.Decimal(data.price), startDate, endDate, status: CLIENT_ACTIVE } });
-      await assignSlotToClient(tx, service.id, client.id);
+      const assignment = await assignSlotToClient(tx, service.id, client.id);
+      await tx.slot.update({ where: { id: assignment.slot.id }, data: { pinCodeEncrypted: encrypt(data.pinCode) } });
       await tx.payment.create({ data: { clientId: client.id, amount: new Prisma.Decimal(data.price) } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (error) {
@@ -54,6 +56,24 @@ export async function createClient(_previousState: ClientActionState, formData: 
   }
   revalidatePath("/clients"); revalidatePath("/"); revalidatePath("/accounts");
   return {};
+}
+export async function getClientPin(clientId: string) {
+  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { slot: { select: { pinCodeEncrypted: true } } } });
+  if (!client?.slot?.pinCodeEncrypted) return { error: "Aucun code PIN n’est défini pour ce client." };
+  try {
+    return { pinCode: decrypt(client.slot.pinCodeEncrypted) };
+  } catch (error) {
+    console.error("TrustFlix Digital PIN decryption error", error);
+    return { error: "Impossible de déchiffrer le code PIN. Vérifiez ACCOUNT_CREDENTIALS_KEY." };
+  }
+}
+export async function updateClientPin(clientId: string, pinCode: string) {
+  if (!/^\d{4}$/.test(pinCode)) return { error: "Le code PIN doit contenir exactement 4 chiffres." };
+  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { slotId: true } });
+  if (!client?.slotId) return { error: "Ce client n’a pas de slot attribué." };
+  await prisma.slot.update({ where: { id: client.slotId }, data: { pinCodeEncrypted: encrypt(pinCode) } });
+  revalidatePath(`/clients/${clientId}`);
+  return { success: "Code PIN mis à jour." };
 }
 export async function releaseClient(clientId: string) {
   await prisma.$transaction(async tx => { const client = await tx.client.findUniqueOrThrow({ where: { id: clientId } }); await tx.client.update({ where: { id: clientId }, data: { status: CLIENT_EXPIRED } }); if (client.slotId) await tx.slot.update({ where: { id: client.slotId }, data: { status: SLOT_FREE } }); });

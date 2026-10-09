@@ -1,4 +1,5 @@
 import { MessageCircle } from "lucide-react";
+import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { date, money, whatsappUrl } from "../../lib/format";
@@ -37,7 +38,7 @@ export default async function ClientsPage() {
         <thead className="border-b border-zinc-800 text-xs uppercase tracking-wider text-zinc-500"><tr><th className="pb-3 font-medium">Client</th><th className="pb-3 font-medium">Service / slot</th><th className="pb-3 font-medium">Échéance</th><th className="pb-3 font-medium">Prix</th><th className="pb-3 font-medium">Statut</th><th className="pb-3"></th></tr></thead>
         <tbody className="divide-y divide-zinc-800">
           {clients.map(client => <tr className="client-row" key={client.id}>
-            <td className="py-4 font-medium">{client.name}<div className="mt-1 text-xs font-normal text-zinc-500">{client.whatsapp}</div></td>
+            <td className="py-4 font-medium"><Link className="hover:text-amber-300" href={`/clients/${client.id}`}>{client.name}</Link><div className="mt-1 text-xs font-normal text-zinc-500">{client.whatsapp}</div></td>
             <td className="py-4 text-zinc-300">{client.service.name}<div className="mt-1 text-xs text-zinc-500">{client.slot?.identifier ?? "Attribution en cours"}</div></td>
             <td className="py-4 text-zinc-400"><div>{date.format(client.endDate)}</div><ExpiryBadge endDate={client.endDate}/></td>
             <td className="py-4">{money.format(Number(client.price))}</td>
